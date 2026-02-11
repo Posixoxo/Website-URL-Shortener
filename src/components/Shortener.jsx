@@ -12,7 +12,9 @@ const Shortener = () => {
     const savedLinks = localStorage.getItem('shortened-links');
     if (savedLinks) {
       try {
-        setLinks(JSON.parse(savedLinks));
+        const parsed = JSON.parse(savedLinks);
+        console.log('Loaded links from localStorage:', parsed);
+        setLinks(parsed);
       } catch (e) {
         console.error('Failed to parse saved links:', e);
         localStorage.removeItem('shortened-links');
@@ -22,6 +24,7 @@ const Shortener = () => {
 
   useEffect(() => {
     if (links.length > 0) {
+      console.log('Saving links to localStorage:', links);
       localStorage.setItem('shortened-links', JSON.stringify(links));
     }
   }, [links]);
@@ -37,11 +40,11 @@ const Shortener = () => {
     setLoading(true);
 
     try {
-      console.log('Calling API with URL:', url.trim()); // Debug log
+      console.log('Calling API with URL:', url.trim());
       
       const response = await fetch(`/api/shorten?url=${encodeURIComponent(url.trim())}`);
       
-      console.log('Response status:', response.status); // Debug log
+      console.log('Response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -55,10 +58,18 @@ const Shortener = () => {
       }
 
       const data = await response.json();
-      console.log('API response:', data); // Debug log
+      console.log('API response:', data);
       
       if (data.shorturl) {
-        setLinks(prev => [{ id: Date.now(), original: url.trim(), short: data.shorturl }, ...prev]);
+        const newLink = { id: Date.now(), original: url.trim(), short: data.shorturl };
+        console.log('Creating new link:', newLink);
+        
+        setLinks(prev => {
+          const updated = [newLink, ...prev];
+          console.log('Updated links array:', updated);
+          return updated;
+        });
+        
         setUrl(''); 
         setError(false);
       } else if (data.error) {
@@ -84,6 +95,8 @@ const Shortener = () => {
     });
   };
 
+  console.log('Current links state:', links); // Debug log to see if links are in state
+
   return (
     <>
       <div className="input-btn">
@@ -102,28 +115,34 @@ const Shortener = () => {
       </div>
 
       <div className="links-container">
+        {console.log('Rendering links container, links.length:', links.length)}
         <AnimatePresence>
-          {links.map((link, index) => (
-            <motion.div 
-              className="links" 
-              key={link.id} 
-              initial={{ opacity: 0, y: -10 }} 
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-            >
-              <p className="intended-links">{link.original}</p>
-              <div className="right-side-link">
-                <a href={link.short} target="_blank" rel="noreferrer" className="shortened-link">{link.short}</a>
-                <button 
-                  className={copiedIndex === index ? "copy-btn copied" : "copy-btn"}
-                  onClick={() => copyToClipboard(link.short, index)}
-                >
-                  {copiedIndex === index ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            </motion.div>
-          ))}
+          {links.map((link, index) => {
+            console.log('Rendering link:', link);
+            return (
+              <motion.div 
+                className="links" 
+                key={link.id} 
+                initial={{ opacity: 0, y: -10 }} 
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+              >
+                <p className="intended-links">{link.original}</p>
+                <div className="right-side-link">
+                  <a href={link.short} target="_blank" rel="noreferrer" className="shortened-link">
+                    {link.short}
+                  </a>
+                  <button 
+                    className={copiedIndex === index ? "copy-btn copied" : "copy-btn"}
+                    onClick={() => copyToClipboard(link.short, index)}
+                  >
+                    {copiedIndex === index ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     </>
