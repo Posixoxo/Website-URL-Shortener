@@ -10,41 +10,54 @@ const Shortener = () => {
 
   useEffect(() => {
     const savedLinks = localStorage.getItem('shortened-links');
-    if (savedLinks) setLinks(JSON.parse(savedLinks));
+    if (savedLinks) {
+      try {
+        setLinks(JSON.parse(savedLinks));
+      } catch (e) {
+        console.error('Failed to parse saved links:', e);
+        localStorage.removeItem('shortened-links');
+      }
+    }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('shortened-links', JSON.stringify(links));
+    if (links.length > 0) {
+      localStorage.setItem('shortened-links', JSON.stringify(links));
+    }
   }, [links]);
 
   const handleShorten = async (e) => {
     if (e) e.preventDefault();
-    if (!url.trim()) { setError(true); return; }
+    if (!url.trim()) { 
+      setError(true); 
+      return; 
+    }
 
     setError(false);
     setLoading(true);
 
     try {
-      // Logic: If on localhost, use the API directly. If on Vercel, use our proxy.
-      const isLocal = window.location.hostname === 'localhost';
-      const fetchUrl = isLocal 
-        ? `https://is.gd/create.php?format=json&url=${encodeURIComponent(url.trim())}`
-        : `/api/shorten?url=${encodeURIComponent(url.trim())}`;
-
-      const response = await fetch(fetchUrl);
+      // Always use the /api route - Vercel will handle it
+      const response = await fetch(`/api/shorten?url=${encodeURIComponent(url.trim())}`);
       
-      // If we are on Vercel and it returned the raw code (the error you saw), 
-      // it means the /api folder isn't in the right place or Vercel hasn't built it yet.
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("API returned non-JSON. This usually means the /api function isn't running.");
+        throw new Error("API returned non-JSON response");
       }
 
       const data = await response.json();
       
       if (data.shorturl) {
-        setLinks([{ id: Date.now(), original: url.trim(), short: data.shorturl }, ...links]);
+        setLinks(prev => [{ id: Date.now(), original: url.trim(), short: data.shorturl }, ...prev]);
         setUrl(''); 
+        setError(false);
+      } else if (data.error) {
+        console.error('API Error:', data.error);
+        setError(true);
       } else {
         setError(true);
       }
@@ -57,9 +70,12 @@ const Shortener = () => {
   };
 
   const copyToClipboard = (text, index) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+    });
   };
 
   return (
@@ -68,11 +84,10 @@ const Shortener = () => {
         <input 
           type="text" 
           placeholder="Shorten a link here..." 
-          className="input"
+          className={error ? "input error-input" : "input"}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleShorten(e)}
-          style={error ? { border: "3px solid hsl(0, 87%, 67%)" } : {}}
         />
         {error && <p className="error-msg">Please add a valid link</p>}
         <button className="btn1" onClick={handleShorten} disabled={loading}>
@@ -83,11 +98,21 @@ const Shortener = () => {
       <div className="links-container">
         <AnimatePresence>
           {links.map((link, index) => (
-            <motion.div className="links" key={link.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.div 
+              className="links" 
+              key={link.id} 
+              initial={{ opacity: 0, y: -10 }} 
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
               <p className="intended-links">{link.original}</p>
               <div className="right-side-link">
                 <a href={link.short} target="_blank" rel="noreferrer" className="shortened-link">{link.short}</a>
-                <button className="copy-btn" onClick={() => copyToClipboard(link.short, index)}>
+                <button 
+                  className={copiedIndex === index ? "copy-btn copied" : "copy-btn"}
+                  onClick={() => copyToClipboard(link.short, index)}
+                >
                   {copiedIndex === index ? "Copied!" : "Copy"}
                 </button>
               </div>

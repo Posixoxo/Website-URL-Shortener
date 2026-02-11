@@ -791,4 +791,11 @@ footer{
   transform-origin: center;
 }
 
+.input.error-input {
+  border: 3px solid hsl(0, 87%, 67%);
+}
+
+.copy-btn.copied {
+  background-color: hsl(257, 27%, 26%);
+}
 
