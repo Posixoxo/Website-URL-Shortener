@@ -37,8 +37,11 @@ const Shortener = () => {
     setLoading(true);
 
     try {
-      // Always use the /api route - Vercel will handle it
+      console.log('Calling API with URL:', url.trim()); // Debug log
+      
       const response = await fetch(`/api/shorten?url=${encodeURIComponent(url.trim())}`);
+      
+      console.log('Response status:', response.status); // Debug log
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -46,10 +49,13 @@ const Shortener = () => {
 
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
         throw new Error("API returned non-JSON response");
       }
 
       const data = await response.json();
+      console.log('API response:', data); // Debug log
       
       if (data.shorturl) {
         setLinks(prev => [{ id: Date.now(), original: url.trim(), short: data.shorturl }, ...prev]);
@@ -91,7 +97,7 @@ const Shortener = () => {
         />
         {error && <p className="error-msg">Please add a valid link</p>}
         <button className="btn1" onClick={handleShorten} disabled={loading}>
-          {loading ? "..." : "Shorten It!"}
+          {loading ? "Shortening..." : "Shorten It!"}
         </button>
       </div>
 
